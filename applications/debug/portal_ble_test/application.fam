@@ -1,0 +1,8 @@
+App(
+    appid="portal_ble_test",
+    name="Portal BLE Test",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="portal_ble_test_app",
+    stack_size=3 * 1024,
+    fap_category="Debug",
+)

@@ -97,6 +97,13 @@ bool gap_init(
     GapEventCallback on_event_cb,
     void* context);
 
+/** Internal initializer for the exclusive central profile. Requires Full stack. */
+bool gap_init_central(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context);
+
 void gap_start_advertising(void);
 
 void gap_stop_advertising(void);

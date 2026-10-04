@@ -9,6 +9,7 @@ env:
 
 jobs:
   merge_report:
+    if: github.repository == 'flipperdevices/flipperzero-firmware'
     runs-on: [self-hosted, FlipperZeroShell]
     steps:
       - name: 'Wipe workspace'

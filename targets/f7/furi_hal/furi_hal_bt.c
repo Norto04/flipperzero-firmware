@@ -1,3 +1,4 @@
+#include <profiles/central_profile.h>
 #include "ble_glue.h"
 #include <core/check.h>
 #include <gap.h>
@@ -185,7 +186,11 @@ FuriHalBleProfileBase* furi_hal_bt_start_app(
 
         profile_template->get_gap_config(&current_config, params);
 
-        if(!gap_init(&current_config, root_keys, event_cb, context)) {
+        bool gap_initialized =
+            profile_template == ble_profile_central ?
+                gap_init_central(&current_config, root_keys, event_cb, context) :
+                gap_init(&current_config, root_keys, event_cb, context);
+        if(!gap_initialized) {
             gap_thread_stop();
             FURI_LOG_E(TAG, "Failed to init GAP");
             break;

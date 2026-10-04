@@ -7,6 +7,7 @@ on:
 jobs:
   reindex:
     name: 'Post-release hooks'
+    if: github.repository == 'flipperdevices/flipperzero-firmware'
     runs-on: [self-hosted, FlipperZeroShell]
     steps:
       - name: 'Checkout code'

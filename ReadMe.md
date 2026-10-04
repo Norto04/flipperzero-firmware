@@ -1,3 +1,88 @@
+# Portal BLE firmware fork
+
+This fork follows official Flipper firmware `dev` and adds an exclusive BLE
+central/GATT-client profile for the Skylanders mobile portal project. The
+maintained branch is `portal-ble`; `dev` remains an upstream reference. The initial
+base is upstream commit `2bbf7a54bae7316da858ab62f22ed8db0b4c661b` (1 October 2026).
+
+The build selects ST's **BLE Full 1.20.0** radio stack. Ordinary peripheral profiles
+remain available. Running a central app switches profiles and temporarily closes
+phone/RPC/HID Bluetooth connections; exiting restores the default serial profile.
+The central profile supports **one unencrypted peer, default MTU 23, writes with
+response up to 20 bytes**. Pairing, simultaneous phone connections, long ATT
+transfers and the console USB relay are outside this initial patch.
+
+`applications/debug/portal_ble_test` builds a FAP under `apps/Debug/`. It targets
+our portal at `D0:11:93:A4:9B:A5`; change `portal_address` in the example for another
+portal. It discovers service `533e1530-3abe-f33f-cd00-594e8b0a8ea3`, notify `1542`
+and write `1543`, discovers the notify characteristic's **actual CCCD**, writes
+solid blue (`43 00 00 FF` padded to 20 bytes), then sends a padded `S` once per
+second after successful write completion. The observed portal's notify value is
+`0x000e` and CCCD `0x0010`; assuming `value_handle + 1` would write to `0x000f`.
+Open the app, turn on the portal and inspect USB/UART device logs. Back restores
+the default Bluetooth profile. Discovery/connect failure stops the test; automatic
+retry and a production USB backend belong in the portal application.
+
+Build from a normal clone with recursive submodules:
+
+```sh
+./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 copro_dist updater_package
+./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 fap_dist
+cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined scripts/tests/portal_ble_packets.c -o /tmp/portal-ble-packets
+/tmp/portal-ble-packets
+# After sourcing scripts/toolchain/fbtenv.sh:
+python3 scripts/portal_ble_flash_check.py
+```
+
+Use the generated **update package**, which includes the Full radio stack and
+assets. A standalone application-CPU firmware image does not replace a previously
+installed Light radio stack. Builds and packet checks are software validation;
+the new Flipper profile and example still require hardware testing. The Pico
+implementation's successful blue/keepalive tests do not validate this radio stack.
+No firmware is automatically flashed by the build or CI.
+
+Initial local validation (4 October 2026): release firmware, updater, SDK and all
+FAPs built successfully; the Portal BLE Test import check passed; native packet
+checks passed with address/undefined-behavior sanitizers. The Full radio image was
+verified byte-for-byte in the update package. The firmware has 68,840 bytes of free
+flash below that image (minimum required: 8,192).
+
+Applications use `<profiles/central_profile.h>` and `bt_profile_start()` /
+`bt_profile_restore_default()`. Callbacks run on the BLE event thread: copy data
+into an application queue and issue commands from the app thread. Serialize ATT
+operations, wait for `ProcedureComplete`, use discovered CCCD handles, and do not
+use a profile instance after restoring Bluetooth. Stop scanning and wait for
+`ScanStopped` before connecting. Cancel an outstanding connection attempt after
+an application deadline. ATT timeout requires disconnect/reconnect, not another
+request on the expired ATT channel. API additions are exported in both target
+SDK tables without changing existing public structure layouts.
+
+To incorporate official firmware updates, keep the published branch history:
+
+```sh
+git remote add upstream https://github.com/flipperdevices/flipperzero-firmware.git # if absent
+git fetch upstream
+git switch portal-ble
+git merge upstream/dev
+git submodule update --init --recursive
+# Resolve conflicts, especially SDK versions, GAP/profile setup and radio options.
+# Run the build and checks above, inspect git diff and both SDK tables, then commit.
+git push origin portal-ble
+```
+
+CI runs on GitHub-hosted Ubuntu, builds the Full-stack package/SDK/apps, checks
+packet boundaries and requires at least two free flash pages below the radio
+stack. Official workflows that need Flipper's private runners/services are gated
+to the upstream repository. When upgrading the base, recheck the radio-stack
+version/layout, SDK exports, phone-profile restoration, portal connection,
+solid-blue command, status notifications and a keepalive run beyond three minutes.
+
+The implementation uses the official ST ACI interface. Moon Firmware's BLE client
+work informed the initial research; this fork does not import its XIP loader,
+UI, protocol-app restructuring or pairing/phone-companion subsystem.
+
+---
+
 <picture>
     <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/dark_theme_banner.png">
     <source media="(prefers-color-scheme: light)" srcset="/.github/assets/light_theme_banner.png">

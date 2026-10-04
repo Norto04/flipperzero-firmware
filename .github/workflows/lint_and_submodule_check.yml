@@ -10,6 +10,7 @@ env:
 
 jobs:
   lint_sources_check_submodules:
+    if: github.repository == 'flipperdevices/flipperzero-firmware'
     runs-on: [self-hosted, FlipperZeroShell]
     steps:
       - name: 'Wipe workspace'

@@ -10,6 +10,7 @@ env:
 
 jobs:
   test_updater_on_bench:
+    if: github.repository == 'flipperdevices/flipperzero-firmware'
     runs-on: [self-hosted, FlipperZeroTest ]
     steps:
       - name: Checkout code

@@ -40,6 +40,7 @@ typedef struct {
     FuriThread* thread;
     FuriMessageQueue* command_queue;
     bool enable_adv;
+    bool central_only;
     bool is_secure;
     uint8_t negotiation_round;
 } Gap;
@@ -357,7 +358,7 @@ static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
     // Skip fist symbol AD_TYPE_COMPLETE_LOCAL_NAME
     char* name = gap->service.adv_name + 1;
     aci_gap_init(
-        GAP_PERIPHERAL_ROLE,
+        gap->central_only ? (GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE) : GAP_PERIPHERAL_ROLE,
         0,
         strlen(name),
         &gap->service.gap_svc_handle,
@@ -502,6 +503,7 @@ static void gap_advertise_stop(void) {
 }
 
 void gap_start_advertising(void) {
+    if(gap->central_only) return;
     furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
     if(gap->state == GapStateIdle) {
         gap->state = GapStateStartingAdv;
@@ -530,12 +532,14 @@ static void gap_advetise_timer_callback(void* context) {
     furi_check(furi_message_queue_put(gap->command_queue, &command, 0) == FuriStatusOk);
 }
 
-bool gap_init(
+static bool gap_init_role(
     GapConfig* config,
     const GapRootSecurityKeys* root_keys,
     GapEventCallback on_event_cb,
-    void* context) {
-    if(!ble_glue_is_radio_stack_ready()) {
+    void* context,
+    bool central_only) {
+    if(!ble_glue_is_radio_stack_ready() ||
+       (central_only && furi_hal_bt_get_radio_stack() != FuriHalBtStackFull)) {
         return false;
     }
 
@@ -543,6 +547,7 @@ bool gap_init(
 
     gap = malloc(sizeof(Gap));
     gap->config = config;
+    gap->central_only = central_only;
     // Create advertising timer
     gap->advertise_timer = furi_timer_alloc(gap_advetise_timer_callback, FuriTimerTypeOnce, NULL);
     // Initialization of GATT & GAP layer
@@ -591,6 +596,22 @@ bool gap_init(
     gap->context = context;
 
     return true;
+}
+
+bool gap_init(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context) {
+    return gap_init_role(config, root_keys, on_event_cb, context, false);
+}
+
+bool gap_init_central(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context) {
+    return gap_init_role(config, root_keys, on_event_cb, context, true);
 }
 
 GapState gap_get_state(void) {

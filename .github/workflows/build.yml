@@ -19,6 +19,7 @@ env:
 
 jobs:
   main:
+    if: github.repository == 'flipperdevices/flipperzero-firmware'
     runs-on: [self-hosted, FlipperZeroShell]
     strategy:
       fail-fast: false

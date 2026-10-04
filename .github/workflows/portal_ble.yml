@@ -1,0 +1,40 @@
+name: Portal BLE
+
+on:
+  push:
+    branches: [portal-ble]
+  pull_request:
+    branches: [portal-ble]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Test packet boundaries
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined scripts/tests/portal_ble_packets.c -o /tmp/portal-ble-packets
+          /tmp/portal-ble-packets
+      - name: Build Full-stack firmware, update package, SDK and apps
+        run: |
+          ./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 copro_dist updater_package
+          ./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 fap_dist
+      - name: Check SDK exports stay finalized
+        run: git diff --exit-code -- targets/f7/api_symbols.csv
+      - name: Check flash space below Full radio stack
+        shell: bash
+        run: |
+          source scripts/toolchain/fbtenv.sh
+          python3 scripts/fwsize.py free build/f7-firmware-C/firmware.elf
+          python3 scripts/portal_ble_flash_check.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portal-ble-f7
+          path: dist/f7-*/
+          if-no-files-found: error
